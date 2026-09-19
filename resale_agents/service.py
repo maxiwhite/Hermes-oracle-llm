@@ -229,6 +229,55 @@ class ResaleAgentService:
         self._record_event("approval", item_id, {"note": note, "status": "approved"})
         return ok({"item": item})
 
+    def generate_listing_draft(self, item_id: str) -> dict[str, Any]:
+        """Generate a listing draft from a captured item via the listing_draft brain route."""
+        item = self._find_item(item_id)
+        if item is None:
+            return error("not_found", f"Item '{item_id}' was not found.")
+
+        brain_text = f"Generate listing draft for {item.get('title', '')}"
+        specialist = self.brain.route(
+            brain_text,
+            metadata={"listing_draft": True, "inventory": True},
+        )
+        category = self._infer_category(item)
+        missing = [field for field in ("condition", "brand", "size") if not item.get(field)]
+        if not item.get("photos"):
+            missing.append("photos")
+        price = self._estimate_value(category, item)
+        platform = self._choose_platform(category, item)
+        title = self._listing_title(item, category)
+        description = self._listing_description(item, category, missing, price)
+        draft = {
+            "item_id": item_id,
+            "category": category,
+            "platform": platform,
+            "title": title,
+            "description": description,
+            "price": price,
+            "missing_information": missing,
+            "approval_state": item.get("approval_state", "pending"),
+            "specialist": specialist,
+            "status": "draft_ready",
+        }
+
+        item["listing_draft"] = draft
+        item["status"] = "draft_ready"
+        item["updated_at"] = utc_now()
+        item["category"] = category
+        item["platform"] = platform
+        item["price_recommendation"] = price
+        inventory = self.store.inventory()
+        for index, existing in enumerate(inventory):
+            if existing.get("item_id") == item_id:
+                inventory[index] = item
+                break
+        self.store.save_inventory(inventory)
+
+        self._record_event("listing_draft", item_id, {"draft_status": "draft_ready", "specialist": specialist})
+        update_memory({"task_type": "listing_draft"}, {"result": {"item_id": item_id, "status": "draft_ready"}})
+        return ok({"item": item, "draft": draft})
+
     def run_until_approval(self, item_id: str) -> dict[str, Any]:
         item = self._find_item(item_id)
         if item is None:

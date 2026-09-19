@@ -29,6 +29,16 @@ RESALE_KEYWORDS = (
     "photo",
     "photos",
 )
+LISTING_DRAFT_KEYWORDS = (
+    "listing draft",
+    "draft listing",
+    "generate listing",
+    "create listing",
+    "write listing",
+    "describe item for sale",
+    "listing description",
+    "listing template",
+)
 MEMORY_KEYWORDS = ("remember", "memory", "recall", "archive", "summarise", "summarize", "compress")
 REPO_KEYWORDS = ("repo", "code", "debug", "bug", "patch", "test", "commit", "branch")
 PLANNING_KEYWORDS = ("plan", "route", "strategy", "design", "architecture", "brain")
@@ -74,6 +84,8 @@ def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
 def classify_task(text: str, metadata: dict[str, Any] | None = None) -> str:
     lower = normalize_text(text).lower()
     metadata = metadata or {}
+    if metadata.get("listing_draft") or _contains_any(lower, LISTING_DRAFT_KEYWORDS):
+        return "listing_draft"
     if metadata.get("inventory") or metadata.get("resale") or _contains_any(lower, RESALE_KEYWORDS):
         return "resale"
     if _contains_any(lower, MEMORY_KEYWORDS):
@@ -116,6 +128,8 @@ def _resale_missing_information(text: str, metadata: dict[str, Any]) -> list[str
 def route_specialist(task_type: str, text: str) -> str:
     if task_type == "resale":
         return "RESALE AGENT"
+    if task_type == "listing_draft":
+        return "LISTING DRAFTER"
     if task_type == "memory":
         return "MEMORY KEEPER"
     if task_type == "repo":
@@ -130,6 +144,10 @@ def next_step_for(specialist: str, missing_information: list[str]) -> str:
         if missing_information:
             return "Collect the missing item details, then generate the listing draft."
         return "Produce the listing draft, price band, and approval request."
+    if specialist == "LISTING DRAFTER":
+        if missing_information:
+            return "Collect the missing item details, then generate the listing draft text."
+        return "Produce the listing draft text, title, and description for approval."
     if specialist == "MEMORY KEEPER":
         return "Summarise the durable memory and update the archive."
     if specialist == "REPO AGENT":
@@ -146,9 +164,13 @@ class HermesBrain:
         normalized = normalize_text(text)
         task_type = classify_task(normalized, metadata)
         specialist = route_specialist(task_type, normalized)
-        missing_information = _resale_missing_information(normalized, metadata) if specialist == "RESALE AGENT" else []
+        missing_information = (
+            _resale_missing_information(normalized, metadata)
+            if specialist in {"RESALE AGENT", "LISTING DRAFTER"}
+            else []
+        )
         needs_approval = bool(
-            specialist == "RESALE AGENT"
+            specialist in {"RESALE AGENT", "LISTING DRAFTER"}
             and (
                 missing_information
                 or _contains_any(normalized.lower(), ACTION_KEYWORDS)
