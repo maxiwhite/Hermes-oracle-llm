@@ -4,6 +4,7 @@ from core.prompt_compressor import compress
 from llm.client import call_model
 from memory.store import read_memory, update_memory
 from backend.services.model_router import ModelRouter
+from runtime_state import resolve_data_root
 
 
 CACHE_SCHEMA_VERSION = "hermes-cache-v2-provider-adapter"
@@ -21,7 +22,7 @@ def execute_task(user_input, config):
     compressed = compress(user_input)
     provider = _provider_name(config)
     prompt = {"task": compressed}
-    router = ModelRouter(memory_reader=lambda _plan: read_memory(compressed))
+    router = ModelRouter(hermes_dir=resolve_data_root() / "router", memory_reader=lambda _plan: read_memory(compressed))
 
     def infer(attempt):
         attempt_route = {

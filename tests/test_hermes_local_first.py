@@ -302,6 +302,10 @@ def test_local_client_uses_extended_timeout_for_local_inference(monkeypatch: pyt
 
 
 def test_hermes_api_serves_models_and_chat(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Exercise the HTTP adapter without depending on a live model or leaving
+    # an inference thread holding the shared lock after this test finishes.
+    from backend.routes import llm
+    monkeypatch.setattr(llm, "execute_task", lambda *_args: {"result": "Hermes is ready."})
     monkeypatch.chdir(REPO_ROOT)
     thread = threading.Thread(target=run_server, kwargs={"host": "127.0.0.1", "port": 8011}, daemon=True)
     thread.start()
@@ -324,3 +328,4 @@ def test_hermes_api_serves_models_and_chat(monkeypatch: pytest.MonkeyPatch) -> N
     chat = json.loads(urllib.request.urlopen(request, timeout=30).read().decode("utf-8"))
     assert chat["object"] == "chat.completion"
     assert chat["choices"][0]["message"]["role"] == "assistant"
+    assert chat["choices"][0]["message"]["content"] == "Hermes is ready."

@@ -175,9 +175,21 @@ def _openai_compatible_local_response(prompt, provider_name, provider_config, mo
         "top_p": params.get("top_p", 0.8),
         "max_tokens": params.get("max_tokens", 512),
     }
+    native_chat = provider_name == "lmstudio_windows" and provider_config.get("native_chat", False)
+    endpoint = f"{base_url}/chat/completions"
+    if native_chat:
+        messages = payload.pop("messages")
+        payload.update({
+            "input": messages[1]["content"],
+            "system_prompt": messages[0]["content"],
+            "max_output_tokens": payload.pop("max_tokens"),
+            "reasoning": "off",
+            "store": False,
+        })
+        endpoint = f"{base_url.removesuffix('/v1')}/api/v1/chat"
     try:
         body = _request_json(
-            f"{base_url}/chat/completions",
+            endpoint,
             headers=headers,
             payload=payload,
             method="POST",
@@ -187,7 +199,12 @@ def _openai_compatible_local_response(prompt, provider_name, provider_config, mo
         return None
 
     try:
-        result = body["choices"][0]["message"]["content"]
+        if native_chat:
+            result = "".join(item["content"] for item in body["output"] if item.get("type") == "message")
+            if not result.strip():
+                return None
+        else:
+            result = body["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
         return None
 

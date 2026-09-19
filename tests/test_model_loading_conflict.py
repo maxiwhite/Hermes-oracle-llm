@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from backend.routes import llm
+import time
 
 
 def test_legacy_config_matches_local_first_policy() -> None:
@@ -41,3 +42,14 @@ def test_executor_lock_is_released_after_completed_request(monkeypatch) -> None:
 
     assert response["choices"][0]["message"]["content"] == "ready"
     assert llm._EXECUTOR_LOCK.locked() is False
+
+
+def test_slow_request_returns_actual_answer(monkeypatch) -> None:
+    def slow_task(*_args):
+        time.sleep(5.2)
+        return {"result": "completed answer"}
+
+    monkeypatch.setattr(llm, "execute_task", slow_task)
+    response = llm.chat_completion({"messages": [{"role": "user", "content": "hello"}]})
+    assert response["choices"][0]["message"]["content"] == "completed answer"
+    assert not llm._EXECUTOR_LOCK.locked()
