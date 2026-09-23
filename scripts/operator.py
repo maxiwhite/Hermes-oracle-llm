@@ -3,11 +3,40 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+LOCAL_MODEL_KEY = 'qwen3-1.7b'
+LOCAL_MODEL_ALIAS = 'hermes-free'
+LARGE_MODEL_KEY = 'qwen3.5-4b-verified'
+LOCAL_CONTEXT_LENGTH = '2048'
+
+
+def freebuff_command(executable=None, project_root=ROOT):
+    executable = Path(executable) if executable else shutil.which('freebuff')
+    if not executable:
+        raise RuntimeError('Freebuff CLI is missing. Install it with: npm install -g freebuff')
+    return [str(executable), '--cwd', str(project_root)]
+
+
+def launch_freebuff(executable=None, project_root=ROOT, run=subprocess.call):
+    command = freebuff_command(executable=executable, project_root=project_root)
+    return run(command, cwd=str(project_root))
+
+
+def model_needs_reload(loaded, desired_model_key=LOCAL_MODEL_KEY):
+    alias_entry = next((m for m in loaded if m.get('identifier') == LOCAL_MODEL_ALIAS), None)
+    if alias_entry is None:
+        return True
+    identity = ' '.join(
+        str(alias_entry.get(key, ''))
+        for key in ('modelKey', 'path', 'indexedModelIdentifier')
+    ).lower()
+    return desired_model_key.lower() not in identity
 
 
 def prepare_model():
@@ -16,9 +45,12 @@ def prepare_model():
         raise RuntimeError('LM Studio CLI is missing.')
     subprocess.run([str(lms), 'daemon', 'up'], check=True, timeout=180)
     loaded = json.loads(subprocess.check_output([str(lms), 'ps', '--json'], text=True, timeout=30))
-    if not any(m.get('identifier') == 'hermes-free' for m in loaded):
-        subprocess.run([str(lms), 'load', 'qwen3.5-4b-verified', '--context-length', '2048',
-                        '--identifier', 'hermes-free', '--gpu', 'off', '--parallel', '1'], check=True, timeout=180)
+    if model_needs_reload(loaded):
+        if any(m.get('identifier') == LOCAL_MODEL_ALIAS for m in loaded):
+            subprocess.run([str(lms), 'unload', LOCAL_MODEL_ALIAS], check=True, timeout=60)
+        subprocess.run([str(lms), 'load', LOCAL_MODEL_KEY, '--context-length', LOCAL_CONTEXT_LENGTH,
+                        '--identifier', LOCAL_MODEL_ALIAS, '--gpu', 'off', '--parallel', '1'],
+                       check=True, timeout=180)
     subprocess.run([str(lms), 'server', 'start'], check=True, timeout=30)
 
 
@@ -29,11 +61,14 @@ def main():
     modes.add_argument('--smoke', action='store_true')
     modes.add_argument('--doctor', action='store_true')
     modes.add_argument('--serve', action='store_true')
+    modes.add_argument('--freebuff', action='store_true', help='Open Freebuff on the Hermes project')
     modes.add_argument('--employee', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     os.chdir(ROOT)
     if args.employee is not None:
         return subprocess.call([sys.executable, str(ROOT / 'hermes_employee.py'), *args.employee])
+    if args.freebuff:
+        return launch_freebuff()
     config = json.loads((ROOT / 'config.json').read_text(encoding='utf-8'))
     if config.get('cloud_enabled') or config.get('llm', {}).get('provider') != 'local_router':
         raise RuntimeError('Operator requires cloud_enabled=false and llm.provider=local_router.')

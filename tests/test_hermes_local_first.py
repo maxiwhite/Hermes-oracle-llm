@@ -301,6 +301,24 @@ def test_local_client_uses_extended_timeout_for_local_inference(monkeypatch: pyt
     assert timeouts == [20, 120]
 
 
+def test_simple_chat_prompt_does_not_load_memory_history() -> None:
+    messages = llm_client._messages_for_local_runtime(
+        {
+            "task": {
+                "goal": "Reply exactly: HERMES LOCAL OK",
+                "task_type": "text_reasoning",
+                "compressed_prompt": "T:text_reasoning\nG:Reply exactly: HERMES LOCAL OK",
+                "entities": ["HERMES", "LOCAL", "OK"],
+                "constraints": [],
+            },
+            "task_route": "simple_chat",
+            "memory": {"recent": ["x" * 1200]},
+        }
+    )
+
+    assert "Relevant memory/context" not in messages[1]["content"]
+
+
 def test_hermes_api_serves_models_and_chat(monkeypatch: pytest.MonkeyPatch) -> None:
     # Exercise the HTTP adapter without depending on a live model or leaving
     # an inference thread holding the shared lock after this test finishes.

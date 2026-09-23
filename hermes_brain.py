@@ -43,6 +43,7 @@ MEMORY_KEYWORDS = ("remember", "memory", "recall", "archive", "summarise", "summ
 REPO_KEYWORDS = ("repo", "code", "debug", "bug", "patch", "test", "commit", "branch")
 PLANNING_KEYWORDS = ("plan", "route", "strategy", "design", "architecture", "brain")
 ACTION_KEYWORDS = ("publish", "post", "send", "buy", "pay", "approval", "approve")
+FREEBUFF_KEYWORDS = ("freebuff", "logarhythm", "subangel repair", "fridge brain")
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,8 @@ def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
 def classify_task(text: str, metadata: dict[str, Any] | None = None) -> str:
     lower = normalize_text(text).lower()
     metadata = metadata or {}
+    if metadata.get("freebuff_bridge") or _contains_any(lower, FREEBUFF_KEYWORDS):
+        return "freebuff_bridge"
     if metadata.get("listing_draft") or _contains_any(lower, LISTING_DRAFT_KEYWORDS):
         return "listing_draft"
     if metadata.get("inventory") or metadata.get("resale") or _contains_any(lower, RESALE_KEYWORDS):
@@ -126,6 +129,8 @@ def _resale_missing_information(text: str, metadata: dict[str, Any]) -> list[str
 
 
 def route_specialist(task_type: str, text: str) -> str:
+    if task_type == "freebuff_bridge":
+        return "LOGARHYTHM BRIDGE"
     if task_type == "resale":
         return "RESALE AGENT"
     if task_type == "listing_draft":
@@ -140,6 +145,11 @@ def route_specialist(task_type: str, text: str) -> str:
 
 
 def next_step_for(specialist: str, missing_information: list[str]) -> str:
+    if specialist == "LOGARHYTHM BRIDGE":
+        return (
+            "Read the reviewed Freebuff export or connected repository through the read-only bridge; "
+            "import approved LOGARHYTHM UI, assets, and rules while keeping private Fridge Brain memory local."
+        )
     if specialist == "RESALE AGENT":
         if missing_information:
             return "Collect the missing item details, then generate the listing draft."
@@ -170,11 +180,14 @@ class HermesBrain:
             else []
         )
         needs_approval = bool(
+            specialist == "LOGARHYTHM BRIDGE"
+            or (
             specialist in {"RESALE AGENT", "LISTING DRAFTER"}
             and (
                 missing_information
                 or _contains_any(normalized.lower(), ACTION_KEYWORDS)
                 or metadata.get("needs_approval", True)
+            )
             )
         )
         decision = BrainDecision(

@@ -89,7 +89,7 @@ def _messages_for_local_runtime(prompt):
     task = _compressed_task(prompt)
     memory = prompt.get("memory", {})
     memory_text = ""
-    if memory:
+    if memory and prompt.get("task_route") != "simple_chat":
         memory_text = f"\nRelevant memory/context:\n{json.dumps(memory, ensure_ascii=False)[:1200]}"
     user_content = task.get("compressed_prompt") or task.get("goal") or "Help with the current task."
     return [

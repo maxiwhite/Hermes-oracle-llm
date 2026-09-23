@@ -37,6 +37,17 @@ def test_brain_routes_listing_draft_request() -> None:
     assert "listing draft" in decision["next_step"].lower()
 
 
+def test_brain_routes_freebuff_logarhythm_work_to_bridge() -> None:
+    brain = HermesBrain()
+
+    decision = brain.analyse("Bring the LOGARHYTHM work from Freebuff into Fridge Brain safely.")
+
+    assert decision["task_type"] == "freebuff_bridge"
+    assert decision["specialist"] == "LOGARHYTHM BRIDGE"
+    assert decision["needs_approval"] is True
+    assert "read-only" in decision["next_step"].lower()
+
+
 def test_brain_routes_listing_draft_via_metadata() -> None:
     brain = HermesBrain()
 

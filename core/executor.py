@@ -33,6 +33,7 @@ def execute_task(user_input, config):
             "task_route": attempt["task_route"],
             "params": attempt.get("params", {}),
         }
+        prompt["task_route"] = attempt["task_route"]
         prompt["memory"] = attempt.get("memory", {})
         prompt["repo_index"] = attempt.get("repo_index")
         return call_model(prompt, attempt_route, config)
