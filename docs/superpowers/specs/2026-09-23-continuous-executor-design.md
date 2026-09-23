@@ -50,9 +50,21 @@ Approval is attached to one proposed effect. A pending approval changes that tas
 
 Alternative exits: `awaiting_approval`, `blocked`, or `failed_recoverable`. On failure, Hermes records evidence, removes only the disposable mission worktree when safe, and selects another task.
 
+## Controller and worker pool
+
+One controller owns ranking, assignment, locks, and state transitions. It may run at most three workers concurrently on this PC: a builder for isolated implementation, a verifier for independent checks, and a read-only activity observer. A project-scoped lock prevents two workers from mutating the same repository. Resource limits may reduce concurrency automatically.
+
+The observer is dedicated to seeing what every worker is doing. It maintains a live portfolio activity ledger showing worker identity, project, branch/worktree, current mission, state, start time, last heartbeat, latest verified evidence, blocker, approval needed, and next action. It detects stalled or duplicate work but never edits project code or marks work complete without a receipt.
+
+## ChatGPT/Codex handoff relay
+
+Work created in ChatGPT or Codex enters a local inbox as a versioned JSON manifest plus optional patch or artifact. The manifest identifies the project, repository, base commit, objective, acceptance checks, files, evidence, next action, and approval effects. Chat prose is never executed as a command.
+
+Hermes validates the schema, registered repository, base commit, paths, hashes, and declared effects before accepting a handoff. Accepted work enters the normal mission queue and an isolated worktree. Rejected or stale handoffs receive a receipt explaining why; they never mutate a repository.
+
 ## Health and recovery
 
-The Windows task keeps the scheduler alive, permits battery operation, starts at logon, and restarts after crashes. A heartbeat proves liveness. A lock prevents duplicate workers. Idle cycles use negligible resources and do not call a model.
+The Windows task keeps the controller alive, permits battery operation, starts at logon, and restarts after crashes. Controller and worker heartbeats prove liveness. Process and project locks prevent duplicate execution. Idle cycles use negligible resources and do not call a model.
 
 Before mutation Hermes verifies: registered repository, expected base, clean isolated worktree, sufficient disk space, no unresolved merge, and an available verification command. Checkpoint creation requires all acceptance checks to pass.
 
@@ -65,18 +77,22 @@ Every attempt emits a JSON receipt with timestamps, task and project IDs, base a
 1. Add typed task/effect contracts and effect-based approval classification.
 2. Add deterministic allowlisted runner and repository boundary validation.
 3. Add worktree lifecycle and recovery.
-4. Connect the scheduler so pending approval never blocks unrelated work.
-5. Add evidence receipts and health/status output.
-6. Add one real low-risk verification mission for Hermes itself.
-7. Run focused tests, then the complete suite.
-8. Activate the upgraded Windows worker; do not push or deploy.
+4. Add the controller, project locks, and resource-aware three-worker pool.
+5. Add the validated handoff inbox and receipt-producing importer.
+6. Connect the scheduler so pending approval never blocks unrelated work.
+7. Add evidence receipts and health/status output.
+8. Add one real low-risk verification mission for Hermes itself.
+9. Run focused tests, then the complete suite.
+10. Activate the upgraded Windows worker; do not push or deploy.
 
 ## Acceptance criteria
 
 - Routine local tasks progress without human input.
 - A gated task is queued while another safe task runs.
-- Commands cannot escape the registered worktree.
+- Up to three workers may run, but never two mutating one project.
+- Valid handoffs enter the queue; invalid, stale, or cross-project handoffs are rejected with receipts.
+- Commands and imported paths cannot escape the registered worktree.
 - Failed verification creates no checkpoint.
 - Successful verification creates a recoverable local commit and receipt.
-- Restarting the worker resumes safely without duplicate execution.
+- Restarting the controller resumes safely without duplicate execution.
 - Existing 78-test behavior remains green, with new tests covering every executor boundary.
