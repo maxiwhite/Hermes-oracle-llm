@@ -54,6 +54,66 @@ def prepare_model():
     subprocess.run([str(lms), 'server', 'start'], check=True, timeout=30)
 
 
+def _resale_status_next_action(action_result):
+    pending = int(action_result.get('pending_approvals') or 0)
+    inventory = int(action_result.get('inventory_count') or 0)
+    latest_item_id = action_result.get('latest_item_id')
+    if pending:
+        return f"Review the {pending} pending resale approval before generating more drafts."
+    if inventory and latest_item_id:
+        return f"Open {latest_item_id} and generate its listing draft for approval."
+    if inventory:
+        return "Open the newest inventory item and generate its listing draft for approval."
+    return "Capture one item with title, condition, and photos."
+
+
+def execute_operator_task(task, config, *, model_execute=None, resale_service=None):
+    from core.executor import execute_task
+    from hermes_brain import HermesBrain
+    from resale_agents.service import ResaleAgentService
+
+    brain = HermesBrain()
+    decision = brain.intake(task)
+    action = None
+    action_result = None
+    next_action = decision.next_step
+
+    status_request = any(token in decision.normalized_request.lower() for token in ('status', 'health', 'inventory count'))
+    if decision.specialist == 'RESALE AGENT' and status_request:
+        action = 'resale_agents.health'
+        action_result = (resale_service or ResaleAgentService()).health()
+        next_action = _resale_status_next_action(action_result)
+
+    model_prompt = task
+    if action:
+        model_prompt = (
+            f"User task: {task}\n"
+            f"Hermes route: {decision.route} -> {decision.specialist}\n"
+            f"Local action executed: {action}\n"
+            f"Verified action result: {json.dumps(action_result, ensure_ascii=False, sort_keys=True)}\n"
+            f"Hermes verified next action: {next_action}\n"
+            "Briefly state the verified result and repeat that next action. Do not invent external actions."
+        )
+
+    inference = (model_execute or execute_task)(model_prompt, config)
+    output = {
+        'route': decision.route,
+        'specialist': decision.specialist,
+        'action': action,
+        'action_result': action_result,
+        'result': inference.get('result') or inference.get('message') or decision.next_step,
+        'next_action': next_action,
+        'cache': inference.get('cache', 'miss'),
+    }
+    if inference.get('meta'):
+        output['inference'] = inference['meta']
+    if inference.get('error'):
+        output['error'] = inference['error']
+
+    brain.record_outcome(decision, output)
+    return output
+
+
 def main():
     parser = argparse.ArgumentParser(description='Hermes local operator')
     modes = parser.add_mutually_exclusive_group()
@@ -76,11 +136,10 @@ def main():
     if args.doctor or args.serve:
         return subprocess.call([sys.executable, str(ROOT / 'scripts/hermes_doctor.py'),
                                 *(['--start'] if args.serve else [])])
-    from core.executor import execute_task
     from memory.store import log_session
 
     def run(task):
-        result = execute_task(task, config)
+        result = execute_operator_task(task, config)
         print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
         log_session(task, result)
         return int(bool(result.get('error')) or not bool(result.get('result')))

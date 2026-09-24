@@ -21,8 +21,16 @@ def _provider_name(config):
 def execute_task(user_input, config):
     compressed = compress(user_input)
     provider = _provider_name(config)
-    prompt = {"task": compressed}
-    router = ModelRouter(hermes_dir=resolve_data_root() / "router", memory_reader=lambda _plan: read_memory(compressed))
+    model_task = dict(compressed)
+    model_task["compressed_prompt"] = user_input.strip()
+    prompt = {"task": model_task}
+
+    def memory_for_plan(plan):
+        if plan.get("task_route") == "simple_chat":
+            return {}
+        return read_memory(compressed)
+
+    router = ModelRouter(hermes_dir=resolve_data_root() / "router", memory_reader=memory_for_plan)
 
     def infer(attempt):
         attempt_route = {
@@ -36,6 +44,7 @@ def execute_task(user_input, config):
         prompt["task_route"] = attempt["task_route"]
         prompt["memory"] = attempt.get("memory", {})
         prompt["repo_index"] = attempt.get("repo_index")
+        prompt["raw_chat"] = attempt.get("task_route") == "simple_chat"
         return call_model(prompt, attempt_route, config)
 
     result = router.run_task(user_input, infer)
@@ -49,5 +58,7 @@ def execute_task(user_input, config):
         return {"error": result["error"], "message": result.get("message"), "cache": "miss"}
 
     response = {"result": result["result"], "cache": "hit" if result["source"] == "cache" else "miss"}
+    if result.get("meta"):
+        response["meta"] = result["meta"]
     update_memory(compressed, response)
     return response

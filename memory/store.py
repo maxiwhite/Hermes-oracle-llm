@@ -34,7 +34,24 @@ def _write_structured_payload(payload: dict[str, Any]) -> None:
 def _summarize_value(value: Any, limit: int = 240) -> Any:
     if isinstance(value, dict):
         summary: dict[str, Any] = {}
-        for key in ("result", "message", "provider", "model", "mode", "specialist", "route", "task_type", "status"):
+        for key in (
+            "result",
+            "message",
+            "provider",
+            "model",
+            "mode",
+            "specialist",
+            "route",
+            "task_type",
+            "status",
+            "action",
+            "action_result",
+            "next_action",
+            "service",
+            "inventory_count",
+            "pending_approvals",
+            "latest_item_id",
+        ):
             if key in value:
                 summary[key] = _summarize_value(value[key], limit)
         if summary:

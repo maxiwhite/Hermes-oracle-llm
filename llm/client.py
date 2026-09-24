@@ -87,11 +87,11 @@ def _local_runtime_response(prompt, provider_name, model_name):
 
 def _messages_for_local_runtime(prompt):
     task = _compressed_task(prompt)
-    memory = prompt.get("memory", {})
+    user_content = task.get("compressed_prompt") or task.get("goal") or "Help with the current task."
+    memory = {} if prompt.get("raw_chat") else prompt.get("memory", {})
     memory_text = ""
     if memory and prompt.get("task_route") != "simple_chat":
         memory_text = f"\nRelevant memory/context:\n{json.dumps(memory, ensure_ascii=False)[:1200]}"
-    user_content = task.get("compressed_prompt") or task.get("goal") or "Help with the current task."
     return [
         {
             "role": "system",
@@ -180,8 +180,8 @@ def _openai_compatible_local_response(prompt, provider_name, provider_config, mo
     if native_chat:
         messages = payload.pop("messages")
         payload.update({
-            "input": messages[1]["content"],
-            "system_prompt": messages[0]["content"],
+            "input": messages[-1]["content"],
+            "system_prompt": messages[0]["content"] if len(messages) > 1 else "",
             "max_output_tokens": payload.pop("max_tokens"),
             "reasoning": "off",
             "store": False,
