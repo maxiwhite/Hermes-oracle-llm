@@ -91,7 +91,9 @@ def chat_completion(payload: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         _EXECUTOR_LOCK.release()
         raise
-    worker.join(timeout=5)
+    # Provider requests already have bounded timeouts. Return their actual
+    # result rather than discarding it behind a five-second warmup response.
+    worker.join()
 
     text = "Hermes is warming up locally and returned a safe stub response."
     result = result_holder.get("value")

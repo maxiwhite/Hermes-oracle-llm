@@ -87,11 +87,11 @@ def _local_runtime_response(prompt, provider_name, model_name):
 
 def _messages_for_local_runtime(prompt):
     task = _compressed_task(prompt)
-    memory = prompt.get("memory", {})
-    memory_text = ""
-    if memory:
-        memory_text = f"\nRelevant memory/context:\n{json.dumps(memory, ensure_ascii=False)[:1200]}"
     user_content = task.get("compressed_prompt") or task.get("goal") or "Help with the current task."
+    memory = {} if prompt.get("raw_chat") else prompt.get("memory", {})
+    memory_text = ""
+    if memory and prompt.get("task_route") != "simple_chat":
+        memory_text = f"\nRelevant memory/context:\n{json.dumps(memory, ensure_ascii=False)[:1200]}"
     return [
         {
             "role": "system",
@@ -175,9 +175,21 @@ def _openai_compatible_local_response(prompt, provider_name, provider_config, mo
         "top_p": params.get("top_p", 0.8),
         "max_tokens": params.get("max_tokens", 512),
     }
+    native_chat = provider_name == "lmstudio_windows" and provider_config.get("native_chat", False)
+    endpoint = f"{base_url}/chat/completions"
+    if native_chat:
+        messages = payload.pop("messages")
+        payload.update({
+            "input": messages[-1]["content"],
+            "system_prompt": messages[0]["content"] if len(messages) > 1 else "",
+            "max_output_tokens": payload.pop("max_tokens"),
+            "reasoning": "off",
+            "store": False,
+        })
+        endpoint = f"{base_url.removesuffix('/v1')}/api/v1/chat"
     try:
         body = _request_json(
-            f"{base_url}/chat/completions",
+            endpoint,
             headers=headers,
             payload=payload,
             method="POST",
@@ -187,7 +199,12 @@ def _openai_compatible_local_response(prompt, provider_name, provider_config, mo
         return None
 
     try:
-        result = body["choices"][0]["message"]["content"]
+        if native_chat:
+            result = "".join(item["content"] for item in body["output"] if item.get("type") == "message")
+            if not result.strip():
+                return None
+        else:
+            result = body["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
         return None
 

@@ -83,6 +83,7 @@ memory/logs.md
 .mia_state/
 data/employee/*.json
 data/employee/*.md
+data/employee/*.log
 data/employee/*.tmp
 data/employee/runtime.lock
 data/security/*.json

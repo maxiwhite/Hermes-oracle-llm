@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from runtime_state import append_text, atomic_write_json, atomic_write_text, ensure_runtime_state, redact_text
+from hermes_brain import HermesBrain
 
 ROOT = Path(__file__).resolve().parent
 SKILLS_DIR = ROOT / "skills"
@@ -456,6 +457,8 @@ def cmd_sources(_: argparse.Namespace) -> None:
 
 
 def route_task(text: str) -> Tuple[Dict[str, Any], List[Tuple[int, Dict[str, Any]]]]:
+    brain = HermesBrain()
+    brain_decision = brain.intake(text).to_dict()
     skills = read_json(SKILLS_DIR / "skill_registry.json", default_skill_registry())
     lower = text.lower()
     scored = []
@@ -467,6 +470,15 @@ def route_task(text: str) -> Tuple[Dict[str, Any], List[Tuple[int, Dict[str, Any
         for token in ["repo", "security", "source", "resale", "inventory", "docs", "memory", "download", "plan", "task", "test", "code"]:
             if token in lower and token in (domain + " " + s.get("id", "") + " " + s.get("description", "")).lower():
                 score += 3
+        specialist = str(brain_decision.get("specialist", ""))
+        if specialist == "RESALE AGENT" and s.get("domain") in {"resale", "inventory"}:
+            score += 8
+        elif specialist == "MEMORY KEEPER" and s.get("domain") == "memory":
+            score += 8
+        elif specialist == "REPO AGENT" and s.get("domain") == "repo":
+            score += 8
+        elif specialist == "TASK PLANNER" and s.get("domain") == "planning":
+            score += 5
         if classify_risk(text) == s.get("risk"):
             score += 2
         if not s.get("network_allowed", False):
@@ -478,8 +490,20 @@ def route_task(text: str) -> Tuple[Dict[str, Any], List[Tuple[int, Dict[str, Any
 
 def cmd_route(args: argparse.Namespace) -> None:
     best, scored = route_task(args.text)
+    brain = HermesBrain()
+    decision = brain.analyse(args.text)
     print(f"BEST SKILL: {best['id']} — {best['name']}")
+    print(f"SPECIALIST: {decision['specialist']}")
+    print(f"COMPLEXITY: {decision['complexity_score']}")
     print(f"RISK: {classify_risk(args.text)}")
+
+
+def cmd_brain(args: argparse.Namespace) -> None:
+    brain = HermesBrain()
+    metadata = json.loads(getattr(args, "metadata", "{}"))
+    if not isinstance(metadata, dict):
+        metadata = {}
+    print(json.dumps(brain.analyse(args.text, metadata), indent=2, ensure_ascii=False))
 
 
 def best_action(text: str) -> str:
@@ -700,7 +724,7 @@ def validate_local_package() -> List[str]:
     required_commands = [
         "status", "character", "security", "tick", "validate", "decide",
         "rights", "skills", "sources", "ethical-check", "source-plan",
-        "security-check",
+        "security-check", "brain",
     ]
     missing = [cmd for cmd in required_commands if f'"{cmd}"' not in source and f"'{cmd}'" not in source]
     if missing:
@@ -754,6 +778,7 @@ def default_source_registry() -> List[Dict[str, Any]]:
         {"id": "source.local.data", "name": "Local Data Files", "type": "file", "trust": 9, "cost": "free", "network_required": False, "approval_required": False, "allowed": True, "notes": "Hermes state and data."},
         {"id": "source.manual.user", "name": "User Input", "type": "manual", "trust": 8, "cost": "free", "network_required": False, "approval_required": False, "allowed": True, "notes": "Information directly provided by MAXI."},
         {"id": "source.github.repo", "name": "GitHub Repository", "type": "github", "trust": 9, "cost": "free", "network_required": True, "approval_required": True, "allowed": True, "notes": "Approved GitHub repo state."},
+        {"id": "source.freebuff.logarhythm", "name": "Freebuff LOGARHYTHM / Subangel Repair", "type": "freebuff_project", "project_id": "vast-cars-leave", "url": "https://freebuff.com/web/project/vast-cars-leave", "mode": "read_only_import", "trust": 8, "cost": "free/plan-limited", "network_required": True, "approval_required": True, "allowed": True, "notes": "Canonical hosted LOGARHYTHM source. Import reviewed UI, assets, and rules only; never upload Hermes or Fridge Brain private memory."},
         {"id": "source.official.docs", "name": "Official Documentation", "type": "web", "trust": 9, "cost": "free", "network_required": True, "approval_required": True, "allowed": True, "notes": "Official docs only."},
         {"id": "source.market.public", "name": "Public Market Data", "type": "web", "trust": 6, "cost": "free/unknown", "network_required": True, "approval_required": True, "allowed": True, "notes": "Pricing evidence, not truth."},
         {"id": "source.social.trends", "name": "Social Trends", "type": "web", "trust": 4, "cost": "free/unknown", "network_required": True, "approval_required": True, "allowed": True, "notes": "Trend signal only."},
@@ -802,6 +827,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("skills").set_defaults(func=cmd_skills)
     sub.add_parser("sources").set_defaults(func=cmd_sources)
     a = sub.add_parser("route"); a.add_argument("text"); a.set_defaults(func=cmd_route)
+    a = sub.add_parser("brain"); a.add_argument("text"); a.add_argument("--metadata", default="{}"); a.set_defaults(func=cmd_brain)
     a = sub.add_parser("best"); a.add_argument("text"); a.set_defaults(func=cmd_best)
     a = sub.add_parser("decide"); a.add_argument("text", nargs="*"); a.set_defaults(func=cmd_decide)
     a = sub.add_parser("source-plan"); a.add_argument("question"); a.set_defaults(func=cmd_source_plan)

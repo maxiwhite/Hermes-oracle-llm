@@ -44,6 +44,20 @@
     "notes": "Repo state with review."
   },
   {
+    "id": "source.freebuff.logarhythm",
+    "name": "Freebuff LOGARHYTHM / Subangel Repair",
+    "type": "freebuff_project",
+    "project_id": "vast-cars-leave",
+    "url": "https://freebuff.com/web/project/vast-cars-leave",
+    "mode": "read_only_import",
+    "trust": 8,
+    "cost": "free/plan-limited",
+    "network_required": true,
+    "approval_required": true,
+    "allowed": true,
+    "notes": "Canonical hosted LOGARHYTHM source. Import reviewed UI, assets, and rules only; never upload Hermes or Fridge Brain private memory."
+  },
+  {
     "id": "source.official.docs",
     "name": "Official Documentation",
     "type": "web",

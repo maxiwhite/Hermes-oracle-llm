@@ -43,12 +43,13 @@ routing:
 providers:
   lmstudio_windows:
     enabled: true
+    native_chat: true
     type: openai_compatible
     base_url: "http://localhost:1234/v1"
     api_key: ""
     env_key: "LM_STUDIO_API_TOKEN"
     model_discovery_timeout_seconds: 20
-    request_timeout_seconds: 120
+    request_timeout_seconds: 300
     device: windows
     priority: 1
     cost: 0
@@ -97,7 +98,7 @@ models:
       top_p: 0.85
       top_k: 40
       repeat_penalty: 1.08
-      max_tokens: 450
+      max_tokens: 128
       context_tokens: 4096
 
   main_reasoning:
@@ -113,7 +114,7 @@ models:
       top_p: 0.80
       top_k: 30
       repeat_penalty: 1.10
-      max_tokens: 900
+      max_tokens: 256
       context_tokens: 8192
 
   coding:
@@ -129,7 +130,7 @@ models:
       top_p: 0.72
       top_k: 20
       repeat_penalty: 1.05
-      max_tokens: 1200
+      max_tokens: 384
       context_tokens: 8192
       stop_on_unverified_commands: true
 

@@ -1,22 +1,12 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-
-call scripts\start_local_model.cmd
-if errorlevel 1 (
-    echo.
-    echo Hermes could not prepare its free local model.
-    pause
-    exit /b 1
+if not defined HERMES_PYTHON set "HERMES_PYTHON=%~dp0.venv\Scripts\python.exe"
+if not exist "%HERMES_PYTHON%" (
+  echo [FAIL] Python environment missing. Set HERMES_PYTHON to a Python with requirements.txt installed.
+  exit /b 1
 )
-
-python scripts\hermes_doctor.py --start
-set "HERMES_EXIT=%ERRORLEVEL%"
-
-if not "%HERMES_EXIT%"=="0" (
-    echo.
-    echo Hermes did not start. Read the [FAIL] lines above.
-    pause
-)
-
-exit /b %HERMES_EXIT%
+if not defined HERMES_DATA_DIR set "HERMES_DATA_DIR=%LOCALAPPDATA%\HermesOracle"
+set "PYTHONDONTWRITEBYTECODE=1"
+"%HERMES_PYTHON%" scripts\operator.py %*
+exit /b %ERRORLEVEL%
