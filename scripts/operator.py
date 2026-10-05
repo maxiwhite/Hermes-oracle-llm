@@ -111,8 +111,9 @@ def execute_operator_task(task, config, *, model_execute=None, resale_service=No
         output['error'] = inference['error']
     model_text = inference.get('result')
     valid_text = isinstance(model_text, str) and bool(model_text.strip())
-    mode = inference.get('meta', {}).get('mode')
-    if not inference.get('error') and (not valid_text or mode == 'stub'):
+    metadata = inference.get('meta')
+    mode = metadata.get('mode') if isinstance(metadata, dict) else None
+    if not inference.get('error') and (not valid_text or mode != 'local'):
         output['error'] = 'unverified-model-response'
         output['result'] = 'No useful model answer was verified. Check the local provider and retry.'
     output['verification'] = {

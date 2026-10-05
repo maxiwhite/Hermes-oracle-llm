@@ -84,6 +84,7 @@ def test_operator_task_routes_executes_records_and_returns_next_action(monkeypat
         return {
             "result": "Your resale inventory is empty. Capture one item with title, condition, and photos.",
             "cache": "miss",
+            "meta": {"mode": "local"},
         }
 
     result = operator.execute_operator_task(
@@ -176,6 +177,9 @@ def test_listing_draft_request_is_not_replaced_by_inventory_status(monkeypatch, 
 @pytest.mark.parametrize("response", [
     {"result": "HERMES STUB MODE", "meta": {"mode": "stub"}},
     {"result": "   ", "meta": {"mode": "local"}},
+    {"result": "Unattributed answer"},
+    {"result": "Unattributed answer", "meta": None},
+    {"result": "Cloud answer", "meta": {"mode": "openai"}},
 ])
 def test_operator_rejects_placeholder_or_empty_model_answers(monkeypatch, tmp_path, response):
     monkeypatch.setenv("HERMES_DATA_DIR", str(tmp_path / "runtime"))
