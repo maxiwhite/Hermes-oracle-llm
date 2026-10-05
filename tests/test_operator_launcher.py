@@ -204,3 +204,24 @@ def test_operator_receipt_distinguishes_local_answer_from_tool_evidence(monkeypa
         "tool_status": "ok", "scope": "local-only",
     }
     assert result["inference"]["model"] == "hermes-free"
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_operator_receipt_survives_recorded_context(monkeypatch, tmp_path, failed):
+    monkeypatch.setenv("HERMES_DATA_DIR", str(tmp_path / "runtime"))
+    inference = {"result": "Useful answer", "cache": "hit", "meta": {
+        "mode": "local", "provider": "lmstudio_windows", "model": "hermes-free",
+    }}
+    if failed:
+        inference["error"] = "timeout"
+    result = operator.execute_operator_task(
+        "Hello", {"cloud_enabled": False}, model_execute=lambda *_: inference,
+    )
+    saved = read_context_profile("hermes_brain")["last_event"]["result"]
+    assert saved["verification"] == result["verification"]
+    assert saved["verification"]["model_response"] is (not failed)
+    assert saved["verification"]["tool_executed"] is False
+    assert saved["inference"] == inference["meta"]
+    assert saved["cache"] == "hit"
+    if failed:
+        assert saved["error"] == "timeout"

@@ -35,6 +35,10 @@ def _summarize_value(value: Any, limit: int = 240) -> Any:
     if isinstance(value, dict):
         summary: dict[str, Any] = {}
         for key in (
+            "verification",
+            "error",
+            "inference",
+            "cache",
             "result",
             "message",
             "provider",
@@ -59,6 +63,8 @@ def _summarize_value(value: Any, limit: int = 240) -> Any:
         return {key: _summarize_value(item, limit) for key, item in list(value.items())[:8]}
     if isinstance(value, list):
         return [_summarize_value(item, limit) for item in value[:8]]
+    if isinstance(value, bool) or value is None:
+        return value
     text = str(value)
     return text if len(text) <= limit else text[:limit] + "…"
 

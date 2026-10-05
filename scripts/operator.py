@@ -1,11 +1,16 @@
 """Local operator entrypoint: no model downloads or automatic cloud fallback."""
+import sys
+
+# Direct execution must not shadow the standard-library operator module.
+if __name__ == "__main__" and not __package__:
+    sys.path.pop(0)
+
 import argparse
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
