@@ -1,4 +1,5 @@
 import sys
+import pytest
 
 from scripts import operator
 from memory.store import read_context_profile
@@ -170,3 +171,32 @@ def test_listing_draft_request_is_not_replaced_by_inventory_status(monkeypatch, 
     assert result["specialist"] == "LISTING DRAFTER"
     assert result["action"] is None
     assert result["action_result"] is None
+
+
+@pytest.mark.parametrize("response", [
+    {"result": "HERMES STUB MODE", "meta": {"mode": "stub"}},
+    {"result": "   ", "meta": {"mode": "local"}},
+])
+def test_operator_rejects_placeholder_or_empty_model_answers(monkeypatch, tmp_path, response):
+    monkeypatch.setenv("HERMES_DATA_DIR", str(tmp_path / "runtime"))
+    result = operator.execute_operator_task(
+        "Hello", {"cloud_enabled": False}, model_execute=lambda *_: response,
+    )
+    assert result["error"] == "unverified-model-response"
+    assert result["verification"]["model_response"] is False
+
+
+def test_operator_receipt_distinguishes_local_answer_from_tool_evidence(monkeypatch, tmp_path):
+    monkeypatch.setenv("HERMES_DATA_DIR", str(tmp_path / "runtime"))
+    result = operator.execute_operator_task(
+        "Check resale inventory status and tell me the next action.",
+        {"cloud_enabled": False},
+        model_execute=lambda *_: {"result": "Capture one item.", "meta": {
+            "mode": "local", "provider": "lmstudio_windows", "model": "hermes-free",
+        }},
+    )
+    assert result["verification"] == {
+        "model_response": True, "tool_executed": True,
+        "tool_status": "ok", "scope": "local-only",
+    }
+    assert result["inference"]["model"] == "hermes-free"

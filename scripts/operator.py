@@ -109,6 +109,18 @@ def execute_operator_task(task, config, *, model_execute=None, resale_service=No
         output['inference'] = inference['meta']
     if inference.get('error'):
         output['error'] = inference['error']
+    model_text = inference.get('result')
+    valid_text = isinstance(model_text, str) and bool(model_text.strip())
+    mode = inference.get('meta', {}).get('mode')
+    if not inference.get('error') and (not valid_text or mode == 'stub'):
+        output['error'] = 'unverified-model-response'
+        output['result'] = 'No useful model answer was verified. Check the local provider and retry.'
+    output['verification'] = {
+        'model_response': valid_text and mode == 'local' and not bool(output.get('error')),
+        'tool_executed': action is not None,
+        'tool_status': action_result.get('status') if isinstance(action_result, dict) else None,
+        'scope': 'local-only',
+    }
 
     brain.record_outcome(decision, output)
     return output

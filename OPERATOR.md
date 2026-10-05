@@ -8,6 +8,23 @@ Start from PowerShell:
 
 Enter a task at the Hermes prompt. Type `exit` to stop.
 
+## Verify a complete local cycle
+
+Run `start-hermes.cmd --task "Check resale inventory status and tell me the next action."`.
+The JSON response includes the executed tool, its observed result, the model provider
+and model identifier, and a `verification` receipt. `model_response: true` requires
+nonempty text from a local provider with no inference error; a stub or empty answer
+is rejected and the command exits unsuccessfully. `tool_executed` and `tool_status`
+are separate from model success: a conversational answer alone is not a tool cycle.
+The receipt is recorded with the outcome in runtime memory. A cache hit is identified
+explicitly and is not evidence of a fresh inference request.
+
+For an isolated check, set `HERMES_DATA_DIR` to a new validation directory before
+running the command. This avoids reading or changing your normal inventory. Set
+`HERMES_PYTHON` to an existing environment if working from a checkout without `.venv`.
+Startup only loads an already-installed model; missing runtimes/models should be
+resolved locally rather than enabling cloud fallback. Do not commit runtime receipts.
+
 Other modes of the same launcher:
 
 - `--task "Draft a short description for a used watch."`: one local model response.
