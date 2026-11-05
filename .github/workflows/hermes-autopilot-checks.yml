@@ -1,6 +1,9 @@
 name: Hermes Autopilot Checks
 
+# Run after a reviewed merge as well as on PRs and manual dispatch.
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
